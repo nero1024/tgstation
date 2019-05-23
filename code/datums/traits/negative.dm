@@ -1,7 +1,22 @@
 //predominantly negative traits
 
+/datum/quirk/badback
+	name = "Bad Back"
+	desc = "Thanks to your poor posture, backpacks and other bags never sit right on your back. More evently weighted objects are fine, though."
+	value = -2
+	mood_quirk = TRUE
+	gain_text = "<span class='danger'>Your back REALLY hurts!</span>"
+	lose_text = "<span class='notice'>Your back feels better.</span>"
+
+/datum/quirk/badback/on_process()
+	var/mob/living/carbon/human/H = quirk_holder
+	if(H.back && istype(H.back, /obj/item/storage/backpack))
+		SEND_SIGNAL(quirk_holder, COMSIG_ADD_MOOD_EVENT, "back_pain", /datum/mood_event/back_pain)
+	else
+		SEND_SIGNAL(quirk_holder, COMSIG_CLEAR_MOOD_EVENT, "back_pain")
+
 /datum/quirk/blooddeficiency
-	name = "Acute Blood Deficiency"
+	name = "Blood Deficiency"
 	desc = "Your body can't produce enough blood to sustain itself."
 	value = -2
 	gain_text = "<span class='danger'>You feel your vigor slowly fading away.</span>"
@@ -13,7 +28,8 @@
 	if(NOBLOOD in H.dna.species.species_traits) //can't lose blood if your species doesn't have any
 		return
 	else
-		quirk_holder.blood_volume -= 0.275
+		if (H.blood_volume > (BLOOD_VOLUME_SAFE - 25)) // just barely survivable without treatment
+			H.blood_volume -= 0.275
 
 /datum/quirk/blindness
 	name = "Blind"
@@ -62,6 +78,10 @@
 	lose_text = "<span class='notice'>You no longer feel depressed.</span>" //if only it were that easy!
 	medical_record_text = "Patient has a severe mood disorder causing them to experience sudden moments of sadness."
 	mood_quirk = TRUE
+
+/datum/quirk/depression/on_process()
+	if(prob(0.05))
+		SEND_SIGNAL(quirk_holder, COMSIG_ADD_MOOD_EVENT, "depression", /datum/mood_event/depression)
 
 /datum/quirk/family_heirloom
 	name = "Family Heirloom"
@@ -294,42 +314,6 @@
 		if(I.fingerprintslast == quirk_holder.ckey)
 			quirk_holder.put_in_hands(I)
 
-
-/datum/quirk/paraplegic
-	name = "Paraplegic"
-	desc = "Your legs do not function. Nothing will ever fix this. But hey, free wheelchair!"
-	value = -3
-	human_only = TRUE
-	gain_text = null // Handled by trauma.
-	lose_text = null
-	medical_record_text = "Patient has an untreatable impairment in motor function in the lower extremities."
-
-/datum/quirk/paraplegic/add()
-	var/datum/brain_trauma/severe/paralysis/paraplegic/T = new()
-	var/mob/living/carbon/human/H = quirk_holder
-	H.gain_trauma(T, TRAUMA_RESILIENCE_ABSOLUTE)
-
-/datum/quirk/paraplegic/on_spawn()
-	if(quirk_holder.buckled) // Handle late joins being buckled to arrival shuttle chairs.
-		quirk_holder.buckled.unbuckle_mob(quirk_holder)
-
-	var/turf/T = get_turf(quirk_holder)
-	var/obj/structure/chair/spawn_chair = locate() in T
-
-	var/obj/vehicle/ridden/wheelchair/wheels = new(T)
-	if(spawn_chair) // Makes spawning on the arrivals shuttle more consistent looking
-		wheels.setDir(spawn_chair.dir)
-
-	wheels.buckle_mob(quirk_holder)
-
-	// During the spawning process, they may have dropped what they were holding, due to the paralysis
-	// So put the things back in their hands.
-
-	for(var/obj/item/I in T)
-		if(I.fingerprintslast == quirk_holder.ckey)
-			quirk_holder.put_in_hands(I)
-
-
 /datum/quirk/poor_aim
 	name = "Poor Aim"
 	desc = "You're terrible with guns and can't line up a straight shot to save your life. Dual-wielding is right out."
@@ -472,7 +456,7 @@
 		for(var/i in 1 to 7)
 			var/obj/item/reagent_containers/pill/P = new(drug_instance)
 			P.icon_state = pill_state
-			P.list_reagents = list("[reagent_id]" = 1)
+			P.reagents.add_reagent(reagent_id, 1)
 
 	if (accessory_type)
 		accessory_instance = new accessory_type(current_turf)
@@ -530,11 +514,11 @@
 		/obj/item/storage/fancy/cigarettes/cigars,
 		/obj/item/storage/fancy/cigarettes/cigars/cohiba,
 		/obj/item/storage/fancy/cigarettes/cigars/havana)
-	. = ..()	
+	. = ..()
 
 /datum/quirk/junkie/smoker/announce_drugs()
 	to_chat(quirk_holder, "<span class='boldnotice'>There is a [drug_instance.name] [where_drug], and a lighter [where_accessory]. Make sure you get your favorite brand when you run out.</span>")
-	
+
 
 /datum/quirk/junkie/smoker/on_process()
 	. = ..()
@@ -542,7 +526,16 @@
 	var/obj/item/I = H.get_item_by_slot(SLOT_WEAR_MASK)
 	if (istype(I, /obj/item/clothing/mask/cigarette))
 		var/obj/item/storage/fancy/cigarettes/C = drug_instance
-		if(istype(I, C.spawn_type))	
+		if(istype(I, C.spawn_type))
 			SEND_SIGNAL(quirk_holder, COMSIG_CLEAR_MOOD_EVENT, "wrong_cigs")
 			return
 		SEND_SIGNAL(quirk_holder, COMSIG_ADD_MOOD_EVENT, "wrong_cigs", /datum/mood_event/wrong_brand)
+
+/datum/quirk/unstable
+	name = "Unstable"
+	desc = "Due to past troubles, you are unable to recover your sanity if you lose it. Be very careful managing your mood!"
+	value = -2
+	mob_trait = TRAIT_UNSTABLE
+	gain_text = "<span class='danger'>There's a lot on your mind right now.</span>"
+	lose_text = "<span class='notice'>Your mind finally feels calm.</span>"
+	medical_record_text = "Patient's mind is in a vulnerable state, and cannot recover from traumatic events."
